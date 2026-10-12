@@ -1,0 +1,183 @@
+/* No-Show Deposit Tracker — static UI. Renders from db.js, no backend. */
+"use strict";
+
+function esc(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+/* ---- Tabs --------------------------------------------------------------- */
+document.querySelectorAll("[data-tab]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("[data-tab]").forEach((b) =>
+      b.classList.toggle("active", b === btn));
+    document.querySelectorAll(".view").forEach((v) =>
+      v.classList.toggle("active", v.id === "view-" + btn.dataset.tab));
+  });
+});
+
+/* ---- Dashboard ----------------------------------------------------------- */
+function renderDashboard() {
+  const s = DB.stats();
+  document.getElementById("st-total").textContent = s.total;
+  document.getElementById("st-rate").textContent = s.no_show_rate + "%";
+  document.getElementById("st-collected").textContent = Math.round(s.collected);
+  document.getElementById("st-forfeited").textContent = Math.round(s.forfeited);
+
+  const overdue = DB.overdueDeposits();
+  const sec = document.getElementById("overdue-section");
+  sec.style.display = overdue.length ? "" : "none";
+  document.getElementById("overdue-body").innerHTML = overdue.map((a) => `
+    <tr>
+      <td><strong>${esc(a.customer_name)}</strong>
+        <div class="muted">${esc(a.customer_phone)}</div></td>
+      <td>${esc(a.service || "—")}</td>
+      <td>${esc(a.appt_date)} ${esc(a.appt_time || "")}</td>
+      <td>${Math.round(a.deposit_amount)} ${esc(a.currency)}</td>
+      <td><div class="row-actions">
+        <button data-wa="${a.id}" data-kind="reminder">📩 Remind</button>
+        <button data-paid="${a.id}">✓ Paid</button>
+      </div></td>
+    </tr>`).join("");
+
+  const upcoming = DB.list({ upcoming_only: true, appt_status: "scheduled" })
+    .slice(0, 15);
+  document.getElementById("upcoming-body").innerHTML = upcoming.length
+    ? upcoming.map((a) => `
+      <tr>
+        <td><strong>${esc(a.customer_name)}</strong></td>
+        <td>${esc(a.service || "—")}</td>
+        <td>${esc(a.appt_date)} ${esc(a.appt_time || "")}</td>
+        <td><span class="pill pill-${a.deposit_status}">${esc(a.deposit_status)}</span></td>
+        <td>${esc((APPT_LABELS[a.appt_status] || a.appt_status))}</td>
+      </tr>`).join("")
+    : `<tr><td colspan="5" class="muted">No upcoming appointments.</td></tr>`;
+}
+
+/* ---- Appointments list ------------------------------------------------------ */
+const filters = { q: "", deposit_status: "", appt_status: "" };
+
+document.getElementById("f-deposit").innerHTML =
+  `<option value="">All deposits</option>` +
+  DEPOSIT_STATUSES.map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
+document.getElementById("f-appt").innerHTML =
+  `<option value="">All statuses</option>` +
+  APPT_STATUSES.map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
+
+function rowActions(a) {
+  return `<div class="row-actions">
+    <button data-wa="${a.id}" data-kind="deposit">📩 WA</button>
+    <button data-paid="${a.id}">✓ Paid</button>
+    <button data-noshow="${a.id}">✗ No-show</button>
+    <button data-done="${a.id}">Done</button>
+  </div>`;
+}
+
+function renderAppointments() {
+  const list = DB.list({
+    deposit_status: filters.deposit_status || null,
+    appt_status: filters.appt_status || null,
+    search: filters.q || null,
+  });
+  document.getElementById("appt-rows").innerHTML = list.length
+    ? list.map((a) => `
+      <tr>
+        <td><strong>${esc(a.customer_name)}</strong>
+          <div class="muted">${esc(a.customer_phone)}</div></td>
+        <td>${esc(a.service || "—")}</td>
+        <td>${esc(a.appt_date)} ${esc(a.appt_time || "")}</td>
+        <td><span class="pill pill-${a.deposit_status}">${esc(a.deposit_status)}</span>
+          <div class="muted">${Math.round(a.deposit_amount)} ${esc(a.currency)}</div></td>
+        <td>${esc(APPT_LABELS[a.appt_status] || a.appt_status)}</td>
+        <td>${rowActions(a)}</td>
+      </tr>`).join("")
+    : `<tr><td colspan="6" class="muted">No appointments found.</td></tr>`;
+}
+
+document.getElementById("f-apply").addEventListener("click", () => {
+  filters.q = document.getElementById("f-q").value.trim();
+  filters.deposit_status = document.getElementById("f-deposit").value;
+  filters.appt_status = document.getElementById("f-appt").value;
+  renderAppointments();
+});
+
+/* ---- Global row actions (delegated) ------------------------------------------ */
+document.addEventListener("click", (e) => {
+  const wa = e.target.closest("[data-wa]");
+  if (wa) {
+    const a = DB.get(wa.dataset.wa);
+    if (a) window.open(DB.whatsappLink(a, wa.dataset.kind), "_blank");
+    return;
+  }
+  const paid = e.target.closest("[data-paid]");
+  if (paid) {
+    DB.update(paid.dataset.paid, { deposit_status: "paid" });
+    renderAll();
+    return;
+  }
+  const noshow = e.target.closest("[data-noshow]");
+  if (noshow) {
+    if (confirm("Mark as no-show? Deposit will be forfeited.")) {
+      DB.update(noshow.dataset.noshow,
+        { appt_status: "no_show", deposit_status: "forfeited" });
+      renderAll();
+    }
+    return;
+  }
+  const done = e.target.closest("[data-done]");
+  if (done) {
+    DB.update(done.dataset.done, { appt_status: "completed" });
+    renderAll();
+  }
+});
+
+/* ---- New appointment dialog ---------------------------------------------------- */
+const dlg = document.getElementById("dlg-appt");
+document.getElementById("btn-new-appt").addEventListener("click", () => {
+  const s = DB.settings();
+  if (s.default_deposit) {
+    document.getElementById("f-deposit-amt").value = s.default_deposit;
+  }
+  dlg.showModal();
+});
+document.getElementById("btn-cancel-appt").addEventListener("click", () =>
+  dlg.close());
+document.getElementById("frm-appt").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const data = {};
+  new FormData(e.target).forEach((v, k) => { data[k] = v === "" ? null : v; });
+  DB.create(data);
+  e.target.reset();
+  dlg.close();
+  renderAll();
+});
+
+/* ---- Settings ------------------------------------------------------------------ */
+function loadSettings() {
+  const s = DB.settings();
+  document.getElementById("s-business").value = s.business_name || "";
+  document.getElementById("s-fps-id").value = s.fps_id || "";
+  document.getElementById("s-fps-name").value = s.fps_name || "";
+  document.getElementById("s-deposit").value = s.default_deposit || "";
+  document.getElementById("s-currency").value = s.currency || "HKD";
+  document.getElementById("s-msg1").value = s.deposit_message || "";
+  document.getElementById("s-msg2").value = s.reminder_message || "";
+}
+document.getElementById("frm-settings").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const data = {};
+  new FormData(e.target).forEach((v, k) => { data[k] = v; });
+  DB.saveSettings(data);
+  const el = document.getElementById("settings-saved");
+  el.textContent = "Saved ✓";
+  setTimeout(() => { el.textContent = ""; }, 2000);
+});
+
+/* ---- Boot ------------------------------------------------------------------------ */
+function renderAll() {
+  renderDashboard();
+  renderAppointments();
+}
+loadSettings();
+renderAll();

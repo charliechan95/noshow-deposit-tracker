@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Deposit Tracker{% endblock %}
+{% block content %}
+<h1>Dashboard</h1>
+
+<section class="cards">
+  <div class="card">
+    <div class="card-num">{{ stats.total }}</div>
+    <div class="card-label">Appointments</div>
+  </div>
+  <div class="card">
+    <div class="card-num">{{ stats.no_show_rate }}%</div>
+    <div class="card-label">No-show rate</div>
+  </div>
+  <div class="card">
+    <div class="card-num">{{ "%.0f"|format(stats.collected) }}</div>
+    <div class="card-label">Deposits collected (HKD)</div>
+  </div>
+  <div class="card">
+    <div class="card-num">{{ "%.0f"|format(stats.forfeited) }}</div>
+    <div class="card-label">Forfeited (HKD)</div>
+  </div>
+</section>
+
+{% if overdue %}
+<section>
+  <h2>⚠️ Deposits pending</h2>
+  <table class="tbl">
+    <thead><tr>
+      <th>Customer</th><th>Service</th><th>Date</th><th>Deposit</th><th></th>
+    </tr></thead>
+    <tbody>
+    {% for a in overdue %}
+      <tr>
+        <td><strong>{{ a.customer_name }}</strong>
+          <div class="muted">{{ a.customer_phone }}</div></td>
+        <td>{{ a.service or "—" }}</td>
+        <td>{{ a.appt_date }} {{ a.appt_time or "" }}</td>
+        <td>{{ "%.0f"|format(a.deposit_amount) }} {{ a.currency }}</td>
+        <td>
+          <button data-wa="{{ a.id }}" data-kind="reminder">📩 Remind</button>
+          <button data-paid="{{ a.id }}">✓ Paid</button>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+<section>
+  <h2>Upcoming appointments</h2>
+  <table class="tbl">
+    <thead><tr>
+      <th>Customer</th><th>Service</th><th>Date</th><th>Deposit</th><th>Status</th>
+    </tr></thead>
+    <tbody>
+    {% for a in upcoming %}
+      <tr>
+        <td><strong>{{ a.customer_name }}</strong></td>
+        <td>{{ a.service or "—" }}</td>
+        <td>{{ a.appt_date }} {{ a.appt_time or "" }}</td>
+        <td><span class="pill pill-{{ a.deposit_status }}">{{ a.deposit_status }}</span></td>
+        <td>{{ a.appt_status.replace('_', ' ').title() }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="5" class="muted">No upcoming appointments.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

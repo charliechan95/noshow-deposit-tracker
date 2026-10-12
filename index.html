@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>No-Show Deposit Tracker</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  .tabs { display: flex; gap: 0.4rem; }
+  .tabs button { border: 1px solid transparent; background: transparent; color: #d8d2c4; }
+  .tabs button.active { background: #3a322a; color: #fff; }
+  .view { display: none; }
+  .view.active { display: block; }
+  .row-actions { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+  .row-actions button { padding: 0.3rem 0.6rem; font-size: 0.85rem; }
+  .pill-pending { background: #fff3cd; color: #856404; }
+  .pill-paid { background: #d4edda; color: #155724; }
+  .pill-waived { background: #e2e3e5; color: #383d41; }
+  .pill-forfeited { background: #f8d7da; color: #721c24; }
+  .pill-refunded { background: #d1ecf1; color: #0c5460; }
+  #frm-settings label { display: block; margin-bottom: 0.8rem; max-width: 560px; }
+  #frm-settings input, #frm-settings textarea { width: 100%; margin-top: 0.25rem; }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">📅 Deposit Tracker</div>
+  <nav class="tabs">
+    <button data-tab="dashboard" class="active">Dashboard</button>
+    <button data-tab="appointments">Appointments</button>
+    <button data-tab="settings">Settings</button>
+  </nav>
+</header>
+<main class="container">
+
+  <!-- Dashboard -->
+  <section id="view-dashboard" class="view active">
+    <h1>Dashboard</h1>
+    <section class="cards">
+      <div class="card"><div class="card-num" id="st-total">0</div>
+        <div class="card-label">Appointments</div></div>
+      <div class="card"><div class="card-num" id="st-rate">0%</div>
+        <div class="card-label">No-show rate</div></div>
+      <div class="card"><div class="card-num" id="st-collected">0</div>
+        <div class="card-label">Deposits collected (HKD)</div></div>
+      <div class="card"><div class="card-num" id="st-forfeited">0</div>
+        <div class="card-label">Forfeited (HKD)</div></div>
+    </section>
+    <section id="overdue-section" style="display:none">
+      <h2>⚠️ Deposits pending</h2>
+      <table class="tbl">
+        <thead><tr>
+          <th>Customer</th><th>Service</th><th>Date</th><th>Deposit</th><th></th>
+        </tr></thead>
+        <tbody id="overdue-body"></tbody>
+      </table>
+    </section>
+    <section>
+      <h2>Upcoming appointments</h2>
+      <table class="tbl">
+        <thead><tr>
+          <th>Customer</th><th>Service</th><th>Date</th><th>Deposit</th><th>Status</th>
+        </tr></thead>
+        <tbody id="upcoming-body"></tbody>
+      </table>
+    </section>
+  </section>
+
+  <!-- Appointments -->
+  <section id="view-appointments" class="view">
+    <h1>Appointments</h1>
+    <div class="toolbar">
+      <div class="search">
+        <input type="text" id="f-q" placeholder="Search customer…">
+        <select id="f-deposit"><option value="">All deposits</option></select>
+        <select id="f-appt"><option value="">All statuses</option></select>
+        <button id="f-apply">Filter</button>
+      </div>
+      <button id="btn-new-appt" class="primary">+ New appointment</button>
+    </div>
+    <table class="tbl">
+      <thead><tr>
+        <th>Customer</th><th>Service</th><th>Date</th>
+        <th>Deposit</th><th>Appt</th><th></th>
+      </tr></thead>
+      <tbody id="appt-rows"></tbody>
+    </table>
+  </section>
+
+  <!-- Settings -->
+  <section id="view-settings" class="view">
+    <h1>Business settings</h1>
+    <p class="muted">Your FPS details go into the WhatsApp messages automatically.</p>
+    <form id="frm-settings">
+      <label>Business name <input name="business_name" id="s-business"></label>
+      <label>FPS ID (phone / email / FPS proxy)
+        <input name="fps_id" id="s-fps-id" placeholder="e.g. 91234567"></label>
+      <label>FPS account name <input name="fps_name" id="s-fps-name"
+             placeholder="e.g. Chan Tai Man"></label>
+      <label>Default deposit amount <input type="number" step="1" min="0"
+             name="default_deposit" id="s-deposit"></label>
+      <label>Currency <input name="currency" id="s-currency" maxlength="3"></label>
+      <label>Deposit request message
+        <textarea name="deposit_message" id="s-msg1" rows="4"></textarea>
+        <div class="muted">Placeholders: {name} {service} {date} {time}
+          {amount} {currency} {fps_id} {fps_name} {business}</div>
+      </label>
+      <label>Reminder message
+        <textarea name="reminder_message" id="s-msg2" rows="4"></textarea>
+      </label>
+      <button type="submit" class="primary">Save settings</button>
+      <span id="settings-saved" class="muted"></span>
+    </form>
+  </section>
+
+</main>
+
+<dialog id="dlg-appt">
+  <form method="dialog" id="frm-appt">
+    <h2>New appointment</h2>
+    <label>Customer name <input name="customer_name" required></label>
+    <label>Phone (with country code, e.g. 85291234567)
+      <input name="customer_phone" required></label>
+    <label>Service <input name="service" placeholder="e.g. Haircut + Colour"></label>
+    <label>Date <input type="date" name="appt_date" required></label>
+    <label>Time <input type="time" name="appt_time"></label>
+    <label>Deposit amount <input type="number" step="1" min="0"
+           name="deposit_amount" id="f-deposit-amt"></label>
+    <label>Currency <input name="currency" value="HKD" maxlength="3"></label>
+    <label>Notes <textarea name="notes" rows="2"></textarea></label>
+    <div class="dlg-actions">
+      <button type="submit" class="primary">Save</button>
+      <button type="button" id="btn-cancel-appt">Cancel</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="db.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

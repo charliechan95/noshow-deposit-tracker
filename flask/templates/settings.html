@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Settings — Deposit Tracker{% endblock %}
+{% block content %}
+<h1>Business settings</h1>
+<p class="muted">Your FPS details go into the WhatsApp messages automatically.</p>
+
+<form id="frm-settings">
+  <label>Business name <input name="business_name" id="s-business"></label>
+  <label>FPS ID (phone / email / FPS proxy)
+    <input name="fps_id" id="s-fps-id" placeholder="e.g. 91234567"></label>
+  <label>FPS account name <input name="fps_name" id="s-fps-name"
+         placeholder="e.g. Chan Tai Man"></label>
+  <label>Default deposit amount <input type="number" step="1" min="0"
+         name="default_deposit" id="s-deposit"></label>
+  <label>Currency <input name="currency" id="s-currency" maxlength="3"></label>
+  <label>Deposit request message
+    <textarea name="deposit_message" id="s-msg1" rows="4"></textarea>
+    <div class="muted">Placeholders: {name} {service} {date} {time}
+      {amount} {currency} {fps_id} {fps_name} {business}</div>
+  </label>
+  <label>Reminder message
+    <textarea name="reminder_message" id="s-msg2" rows="4"></textarea>
+  </label>
+  <button type="submit" class="primary">Save settings</button>
+  <span id="settings-saved" class="muted"></span>
+</form>
+{% endblock %}
