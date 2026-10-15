@@ -3,6 +3,11 @@
    WhatsApp via wa.me deep links. FPS = manual confirm. */
 "use strict";
 
+function _lang() {
+  try { return localStorage.getItem("ndt_lang") || "en"; } catch { return "en"; }
+}
+function _en() { return _lang() === "en"; }
+
 const DEPOSIT_STATUSES = [
   ["pending", "Pending"], ["paid", "Paid"], ["waived", "Waived"],
   ["forfeited", "Forfeited"], ["refunded", "Refunded"],
@@ -32,6 +37,14 @@ const DEFAULT_SETTINGS = {
     "to keep your booking. Thank you!",
 };
 
+const ZH_DEPOSIT =
+  "您好 {name}！您 {date} {time} 的 {service} 預約已為您保留。" +
+  "請以 FPS 支付 HKD {amount} 訂金到 {fps_id}（{fps_name}）作實，" +
+  "並回覆付款截圖。謝謝！";
+const ZH_REMINDER =
+  "您好 {name}！溫馨提示 — 您 {date} 的 {service} 預約訂金 HKD {amount} " +
+  "尚未繳付。請 FPS 到 {fps_id} 以保留您的預約。謝謝！";
+
 const DB = {
   _read(key, fallback) {
     try {
@@ -57,9 +70,16 @@ const DB = {
   },
 
   // ---- Settings ------------------------------------------------------------
+  // Language-dependent template defaults. A saved custom template is
+  // never overridden — these apply only when the user has not saved one.
   settings() {
     const stored = this._read("dep_settings", {});
-    return { ...DEFAULT_SETTINGS, ...stored };
+    const merged = { ...DEFAULT_SETTINGS, ...stored };
+    if (!_en()) {
+      if (!("deposit_message" in stored)) merged.deposit_message = ZH_DEPOSIT;
+      if (!("reminder_message" in stored)) merged.reminder_message = ZH_REMINDER;
+    }
+    return merged;
   },
   saveSettings(data) {
     const stored = this._read("dep_settings", {});
@@ -160,7 +180,7 @@ const DB = {
     const s = this.settings();
     return template
       .replaceAll("{name}", appt.customer_name || "")
-      .replaceAll("{service}", appt.service || "your appointment")
+      .replaceAll("{service}", appt.service || (_en() ? "your appointment" : "您的預約"))
       .replaceAll("{date}", appt.appt_date || "")
       .replaceAll("{time}", appt.appt_time || "")
       .replaceAll("{amount}", appt.deposit_amount || "")
