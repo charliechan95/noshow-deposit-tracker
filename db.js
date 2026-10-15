@@ -197,3 +197,7 @@ const DB = {
     return "https://wa.me/" + digits + "?text=" + encodeURIComponent(message);
   },
 };
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = DB;
+}
