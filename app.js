@@ -7,6 +7,24 @@ function esc(s) {
     .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+/* ---- i18n: status label maps (canonical stored values stay English) ------ */
+const DEPOSIT_STATUS_KEY = {
+  pending: "st_pending", paid: "st_paid", waived: "st_waived",
+  forfeited: "st_forfeited", refunded: "st_refunded",
+};
+const APPT_STATUS_KEY = {
+  scheduled: "ast_scheduled", completed: "ast_completed",
+  no_show: "ast_noshow", cancelled: "ast_cancelled",
+};
+function depositStatusLabel(v) {
+  const k = DEPOSIT_STATUS_KEY[v];
+  return k ? t(k) : (v || "");
+}
+function apptStatusLabel(v) {
+  const k = APPT_STATUS_KEY[v];
+  return k ? t(k) : (v || "");
+}
+
 /* ---- Tabs --------------------------------------------------------------- */
 document.querySelectorAll("[data-tab]").forEach((btn) => {
   btn.addEventListener("click", () => {
@@ -36,8 +54,8 @@ function renderDashboard() {
       <td>${esc(a.appt_date)} ${esc(a.appt_time || "")}</td>
       <td>${Math.round(a.deposit_amount)} ${esc(a.currency)}</td>
       <td><div class="row-actions">
-        <button data-wa="${a.id}" data-kind="reminder">📩 Remind</button>
-        <button data-paid="${a.id}">✓ Paid</button>
+        <button data-wa="${a.id}" data-kind="reminder">${t("btn_remind")}</button>
+        <button data-paid="${a.id}">${t("btn_paid")}</button>
       </div></td>
     </tr>`).join("");
 
@@ -49,28 +67,34 @@ function renderDashboard() {
         <td><strong>${esc(a.customer_name)}</strong></td>
         <td>${esc(a.service || "—")}</td>
         <td>${esc(a.appt_date)} ${esc(a.appt_time || "")}</td>
-        <td><span class="pill pill-${a.deposit_status}">${esc(a.deposit_status)}</span></td>
-        <td>${esc((APPT_LABELS[a.appt_status] || a.appt_status))}</td>
+        <td><span class="pill pill-${a.deposit_status}">${depositStatusLabel(a.deposit_status)}</span></td>
+        <td>${apptStatusLabel(a.appt_status)}</td>
       </tr>`).join("")
-    : `<tr><td colspan="5" class="muted">No upcoming appointments.</td></tr>`;
+    : `<tr><td colspan="5" class="muted">${t("no_upcoming")}</td></tr>`;
 }
 
 /* ---- Appointments list ------------------------------------------------------ */
 const filters = { q: "", deposit_status: "", appt_status: "" };
 
-document.getElementById("f-deposit").innerHTML =
-  `<option value="">All deposits</option>` +
-  DEPOSIT_STATUSES.map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
-document.getElementById("f-appt").innerHTML =
-  `<option value="">All statuses</option>` +
-  APPT_STATUSES.map(([v, l]) => `<option value="${v}">${l}</option>`).join("");
+function buildFilterOptions() {
+  document.getElementById("f-deposit").innerHTML =
+    `<option value="">${t("opt_all_deposits")}</option>` +
+    DEPOSIT_STATUSES.map(([v]) =>
+      `<option value="${v}">${depositStatusLabel(v)}</option>`).join("");
+  document.getElementById("f-appt").innerHTML =
+    `<option value="">${t("opt_all_appt")}</option>` +
+    APPT_STATUSES.map(([v]) =>
+      `<option value="${v}">${apptStatusLabel(v)}</option>`).join("");
+}
+buildFilterOptions();
+window.onLangChange = function () { buildFilterOptions(); };
 
 function rowActions(a) {
   return `<div class="row-actions">
-    <button data-wa="${a.id}" data-kind="deposit">📩 WA</button>
-    <button data-paid="${a.id}">✓ Paid</button>
-    <button data-noshow="${a.id}">✗ No-show</button>
-    <button data-done="${a.id}">Done</button>
+    <button data-wa="${a.id}" data-kind="deposit">${t("btn_wa")}</button>
+    <button data-paid="${a.id}">${t("btn_paid")}</button>
+    <button data-noshow="${a.id}">${t("btn_noshow")}</button>
+    <button data-done="${a.id}">${t("btn_done")}</button>
   </div>`;
 }
 
@@ -87,12 +111,12 @@ function renderAppointments() {
           <div class="muted">${esc(a.customer_phone)}</div></td>
         <td>${esc(a.service || "—")}</td>
         <td>${esc(a.appt_date)} ${esc(a.appt_time || "")}</td>
-        <td><span class="pill pill-${a.deposit_status}">${esc(a.deposit_status)}</span>
+        <td><span class="pill pill-${a.deposit_status}">${depositStatusLabel(a.deposit_status)}</span>
           <div class="muted">${Math.round(a.deposit_amount)} ${esc(a.currency)}</div></td>
-        <td>${esc(APPT_LABELS[a.appt_status] || a.appt_status)}</td>
+        <td>${apptStatusLabel(a.appt_status)}</td>
         <td>${rowActions(a)}</td>
       </tr>`).join("")
-    : `<tr><td colspan="6" class="muted">No appointments found.</td></tr>`;
+    : `<tr><td colspan="6" class="muted">${t("no_records")}</td></tr>`;
 }
 
 document.getElementById("f-apply").addEventListener("click", () => {
@@ -118,7 +142,7 @@ document.addEventListener("click", (e) => {
   }
   const noshow = e.target.closest("[data-noshow]");
   if (noshow) {
-    if (confirm("Mark as no-show? Deposit will be forfeited.")) {
+    if (confirm(t("confirm_noshow"))) {
       DB.update(noshow.dataset.noshow,
         { appt_status: "no_show", deposit_status: "forfeited" });
       renderAll();
@@ -170,7 +194,7 @@ document.getElementById("frm-settings").addEventListener("submit", (e) => {
   new FormData(e.target).forEach((v, k) => { data[k] = v; });
   DB.saveSettings(data);
   const el = document.getElementById("settings-saved");
-  el.textContent = "Saved ✓";
+  el.textContent = t("saved");
   setTimeout(() => { el.textContent = ""; }, 2000);
 });
 
@@ -181,3 +205,4 @@ function renderAll() {
 }
 loadSettings();
 renderAll();
+applyI18n();
