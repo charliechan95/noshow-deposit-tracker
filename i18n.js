@@ -36,7 +36,7 @@ const I18N = {
     lbl_deposit_amount: "Deposit amount", lbl_notes: "Notes",
     btn_cancel: "Cancel",
     btn_wa: "📩 WA", btn_remind: "📩 Remind",
-    btn_paid: "✓ Paid", btn_noshow: "✗ No-show", btn_done: "Done",
+    btn_paid: "✓ Paid", btn_noshow: "✗ No-show", btn_done: "Done", btn_delete: "Delete",
     st_pending: "Pending", st_paid: "Paid", st_waived: "Waived",
     st_forfeited: "Forfeited", st_refunded: "Refunded",
     ast_scheduled: "Scheduled", ast_completed: "Completed",
@@ -44,6 +44,7 @@ const I18N = {
     no_upcoming: "No upcoming appointments.",
     no_records: "No appointments found.",
     confirm_noshow: "Mark as no-show? Deposit will be forfeited.",
+    confirm_delete: "Delete this appointment? This cannot be undone.",
     saved: "Saved ✓",
   },
   zh: {
@@ -79,7 +80,7 @@ const I18N = {
     lbl_deposit_amount: "訂金金額", lbl_notes: "備註",
     btn_cancel: "取消",
     btn_wa: "📩 WhatsApp", btn_remind: "📩 提醒",
-    btn_paid: "✓ 已收", btn_noshow: "✗ 客人未到", btn_done: "完成",
+    btn_paid: "✓ 已收", btn_noshow: "✗ 客人未到", btn_done: "完成", btn_delete: "刪除",
     st_pending: "待收", st_paid: "已收", st_waived: "豁免",
     st_forfeited: "沒收", st_refunded: "已退回",
     ast_scheduled: "已預約", ast_completed: "已完成",
@@ -87,6 +88,7 @@ const I18N = {
     no_upcoming: "未有即將到來的預約。",
     no_records: "未有預約記錄。",
     confirm_noshow: "標記為客人未到？訂金將被沒收。",
+    confirm_delete: "刪除此預約？此操作無法復原。",
     saved: "已儲存 ✓",
   },
 };

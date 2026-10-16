@@ -95,6 +95,7 @@ function rowActions(a) {
     <button data-paid="${a.id}">${t("btn_paid")}</button>
     <button data-noshow="${a.id}">${t("btn_noshow")}</button>
     <button data-done="${a.id}">${t("btn_done")}</button>
+    <button data-del="${a.id}">${t("btn_delete")}</button>
   </div>`;
 }
 
@@ -153,6 +154,14 @@ document.addEventListener("click", (e) => {
   if (done) {
     DB.update(done.dataset.done, { appt_status: "completed" });
     renderAll();
+    return;
+  }
+  const del = e.target.closest("[data-del]");
+  if (del) {
+    if (confirm(t("confirm_delete"))) {
+      DB.remove(del.dataset.del);
+      renderAll();
+    }
   }
 });
 

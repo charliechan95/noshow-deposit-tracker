@@ -148,6 +148,13 @@ const DB = {
     this._write("dep_appts", list);
     return true;
   },
+  remove(id) {
+    const list = this._read("dep_appts", []);
+    const next = list.filter((a) => String(a.id) !== String(id));
+    if (next.length === list.length) return false;
+    this._write("dep_appts", next);
+    return true;
+  },
 
   overdueDeposits() {
     return this._read("dep_appts", [])
