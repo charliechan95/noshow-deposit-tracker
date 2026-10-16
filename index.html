@@ -13,6 +13,8 @@
   .view.active { display: block; }
   .row-actions { display: flex; gap: 0.3rem; flex-wrap: wrap; }
   .row-actions button { padding: 0.3rem 0.6rem; font-size: 0.85rem; }
+  .store-error { background: #f8d7da; color: #721c24; border-radius: 8px;
+    padding: 0.6rem 1rem; margin-bottom: 1rem; font-size: 0.9rem; }
   .pill-pending { background: #fff3cd; color: #856404; }
   .pill-paid { background: #d4edda; color: #155724; }
   .pill-waived { background: #e2e3e5; color: #383d41; }
@@ -44,6 +46,7 @@
   </div>
 </header>
 <main class="container">
+  <div id="store-error" class="store-error" style="display:none"></div>
 
   <!-- Dashboard -->
   <section id="view-dashboard" class="view active">
@@ -54,9 +57,9 @@
       <div class="card"><div class="card-num" id="st-rate">0%</div>
         <div class="card-label" data-i18n="card_noshow_rate">No-show rate</div></div>
       <div class="card"><div class="card-num" id="st-collected">0</div>
-        <div class="card-label" data-i18n="card_collected">Deposits collected (HKD)</div></div>
+        <div class="card-label" id="lbl-collected"></div></div>
       <div class="card"><div class="card-num" id="st-forfeited">0</div>
-        <div class="card-label" data-i18n="card_forfeited">Forfeited (HKD)</div></div>
+        <div class="card-label" id="lbl-forfeited"></div></div>
     </section>
     <section id="overdue-section" style="display:none">
       <h2 data-i18n="overdue_title">⚠️ Deposits pending</h2>
@@ -65,6 +68,15 @@
           <th data-i18n="th_customer">Customer</th><th data-i18n="th_service">Service</th><th data-i18n="th_date">Date</th><th data-i18n="th_deposit">Deposit</th><th></th>
         </tr></thead>
         <tbody id="overdue-body"></tbody>
+      </table>
+    </section>
+    <section id="pastdue-section" style="display:none">
+      <h2 data-i18n="pastdue_title">⚠️ Overdue uncollected deposits</h2>
+      <table class="tbl">
+        <thead><tr>
+          <th data-i18n="th_customer">Customer</th><th data-i18n="th_service">Service</th><th data-i18n="th_date">Date</th><th data-i18n="th_deposit">Deposit</th><th></th>
+        </tr></thead>
+        <tbody id="pastdue-body"></tbody>
       </table>
     </section>
     <section>
@@ -123,6 +135,14 @@
       <button type="submit" class="primary" data-i18n="btn_save">Save settings</button>
       <span id="settings-saved" class="muted"></span>
     </form>
+    <hr>
+    <h2 data-i18n="backup_title">Backup &amp; restore</h2>
+    <div class="row-actions">
+      <button type="button" id="btn-export" data-i18n="btn_export">Export data (JSON)</button>
+      <button type="button" id="btn-import" data-i18n="btn_import">Import data</button>
+      <input type="file" id="file-import" accept=".json,application/json" hidden>
+      <span id="backup-msg" class="muted"></span>
+    </div>
   </section>
 
 </main>
@@ -143,6 +163,29 @@
     <div class="dlg-actions">
       <button type="submit" class="primary" data-i18n="btn_save_form">Save</button>
       <button type="button" id="btn-cancel-appt" data-i18n="btn_cancel">Cancel</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg-edit-appt">
+  <form method="dialog" id="frm-edit-appt">
+    <h2 data-i18n="dlg_edit_appt">Edit appointment</h2>
+    <input type="hidden" name="edit_id">
+    <label><span data-i18n="lbl_customer_name">Customer name</span> <input name="customer_name" required></label>
+    <label><span data-i18n="lbl_phone_cc">Phone (with country code, e.g. 85291234567)</span>
+      <input name="customer_phone" required></label>
+    <label><span data-i18n="lbl_service">Service</span> <input name="service" placeholder="e.g. Haircut + Colour" data-i18n-ph="ph_service"></label>
+    <label><span data-i18n="lbl_date">Date</span> <input type="date" name="appt_date" required></label>
+    <label><span data-i18n="lbl_time">Time</span> <input type="time" name="appt_time"></label>
+    <label><span data-i18n="lbl_deposit_amount">Deposit amount</span> <input type="number" step="1" min="0"
+           name="deposit_amount"></label>
+    <label><span data-i18n="lbl_currency">Currency</span> <input name="currency" maxlength="3"></label>
+    <label><span data-i18n="lbl_deposit_status">Deposit status</span> <select name="deposit_status" id="e-deposit-status"></select></label>
+    <label><span data-i18n="lbl_appt_status">Appointment status</span> <select name="appt_status" id="e-appt-status"></select></label>
+    <label><span data-i18n="lbl_notes">Notes</span> <textarea name="notes" rows="2"></textarea></label>
+    <div class="dlg-actions">
+      <button type="submit" class="primary" data-i18n="btn_save_form">Save</button>
+      <button type="button" id="btn-cancel-edit" data-i18n="btn_cancel">Cancel</button>
     </div>
   </form>
 </dialog>

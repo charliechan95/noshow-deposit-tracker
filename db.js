@@ -54,12 +54,33 @@ const DB = {
       return fallback;
     }
   },
+  _storeFailed() {
+    if (typeof window !== "undefined" &&
+      typeof window.__ndtStorageFailed === "function") {
+      window.__ndtStorageFailed();
+    }
+  },
+  _storeOk() {
+    if (typeof window !== "undefined" &&
+      typeof window.__ndtStorageOk === "function") {
+      window.__ndtStorageOk();
+    }
+  },
   _write(key, value) {
-    localStorage.setItem(key, JSON.stringify(value));
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+      this._storeOk();
+    } catch (err) {
+      this._storeFailed();
+    }
   },
   _nextId() {
     const n = (parseInt(localStorage.getItem("dep_seq") || "0", 10) || 0) + 1;
-    localStorage.setItem("dep_seq", String(n));
+    try {
+      localStorage.setItem("dep_seq", String(n));
+    } catch (err) {
+      this._storeFailed();
+    }
     return n;
   },
   nowIso() {
@@ -160,6 +181,17 @@ const DB = {
     return this._read("dep_appts", [])
       .filter((a) => a.deposit_status === "pending" &&
         a.appt_status === "scheduled" && (a.appt_date || "") >= this.today())
+      .sort((a, b) => (a.appt_date || "").localeCompare(b.appt_date || ""));
+  },
+
+  // Pending deposits on appointments whose date already passed — uncollected
+  // money that neither overdueDeposits() (>= today) nor the upcoming list
+  // would ever surface.
+  pastDueDeposits() {
+    return this._read("dep_appts", [])
+      .filter((a) => a.deposit_status === "pending" &&
+        a.appt_status === "scheduled" &&
+        (a.appt_date || "") !== "" && (a.appt_date || "") < this.today())
       .sort((a, b) => (a.appt_date || "").localeCompare(b.appt_date || ""));
   },
 

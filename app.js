@@ -36,17 +36,47 @@ document.querySelectorAll("[data-tab]").forEach((btn) => {
 });
 
 /* ---- Dashboard ----------------------------------------------------------- */
+function _singleCurrency(list) {
+  const set = new Set((list || []).map((a) => a.currency || "").filter(Boolean));
+  return set.size === 1 ? [...set][0] : null;
+}
+
 function renderDashboard() {
   const s = DB.stats();
   document.getElementById("st-total").textContent = s.total;
   document.getElementById("st-rate").textContent = s.no_show_rate + "%";
   document.getElementById("st-collected").textContent = Math.round(s.collected);
   document.getElementById("st-forfeited").textContent = Math.round(s.forfeited);
+  // Honest currency on the totals: show the real currency when every counted
+  // row shares one; when currencies are mixed, leave it off rather than
+  // mislabel the total.
+  const paidCcy = _singleCurrency(DB.list({ deposit_status: "paid" }));
+  const forfCcy = _singleCurrency(DB.list({ deposit_status: "forfeited" }));
+  document.getElementById("lbl-collected").textContent =
+    t("card_collected") + (paidCcy ? " (" + paidCcy + ")" : "");
+  document.getElementById("lbl-forfeited").textContent =
+    t("card_forfeited") + (forfCcy ? " (" + forfCcy + ")" : "");
 
   const overdue = DB.overdueDeposits();
   const sec = document.getElementById("overdue-section");
   sec.style.display = overdue.length ? "" : "none";
   document.getElementById("overdue-body").innerHTML = overdue.map((a) => `
+    <tr>
+      <td><strong>${esc(a.customer_name)}</strong>
+        <div class="muted">${esc(a.customer_phone)}</div></td>
+      <td>${esc(a.service || "—")}</td>
+      <td>${esc(a.appt_date)} ${esc(a.appt_time || "")}</td>
+      <td>${Math.round(a.deposit_amount)} ${esc(a.currency)}</td>
+      <td><div class="row-actions">
+        <button data-wa="${a.id}" data-kind="reminder">${t("btn_remind")}</button>
+        <button data-paid="${a.id}">${t("btn_paid")}</button>
+      </div></td>
+    </tr>`).join("");
+
+  const pastdue = DB.pastDueDeposits();
+  const psec = document.getElementById("pastdue-section");
+  psec.style.display = pastdue.length ? "" : "none";
+  document.getElementById("pastdue-body").innerHTML = pastdue.map((a) => `
     <tr>
       <td><strong>${esc(a.customer_name)}</strong>
         <div class="muted">${esc(a.customer_phone)}</div></td>
@@ -91,6 +121,7 @@ window.onLangChange = function () { buildFilterOptions(); };
 
 function rowActions(a) {
   return `<div class="row-actions">
+    <button data-edit="${a.id}">${t("btn_edit")}</button>
     <button data-wa="${a.id}" data-kind="deposit">${t("btn_wa")}</button>
     <button data-paid="${a.id}">${t("btn_paid")}</button>
     <button data-noshow="${a.id}">${t("btn_noshow")}</button>
@@ -162,6 +193,11 @@ document.addEventListener("click", (e) => {
       DB.remove(del.dataset.del);
       renderAll();
     }
+    return;
+  }
+  const edit = e.target.closest("[data-edit]");
+  if (edit) {
+    openEditDialog(edit.dataset.edit);
   }
 });
 
@@ -186,6 +222,51 @@ document.getElementById("frm-appt").addEventListener("submit", (e) => {
   renderAll();
 });
 
+/* ---- Edit appointment dialog (mirrors the new-appointment dialog) ------------ */
+const editDlg = document.getElementById("dlg-edit-appt");
+
+function buildEditStatusOptions() {
+  document.getElementById("e-deposit-status").innerHTML =
+    DEPOSIT_STATUSES.map(([v]) =>
+      `<option value="${v}">${depositStatusLabel(v)}</option>`).join("");
+  document.getElementById("e-appt-status").innerHTML =
+    APPT_STATUSES.map(([v]) =>
+      `<option value="${v}">${apptStatusLabel(v)}</option>`).join("");
+}
+
+function openEditDialog(id) {
+  const a = DB.get(id);
+  if (!a) return;
+  buildEditStatusOptions(); // rebuilt at open time so labels match the language
+  const f = document.getElementById("frm-edit-appt");
+  f.elements.edit_id.value = String(a.id);
+  f.elements.customer_name.value = a.customer_name || "";
+  f.elements.customer_phone.value = a.customer_phone || "";
+  f.elements.service.value = a.service || "";
+  f.elements.appt_date.value = a.appt_date || "";
+  f.elements.appt_time.value = a.appt_time || "";
+  f.elements.deposit_amount.value =
+    a.deposit_amount === 0 || a.deposit_amount ? Math.round(a.deposit_amount) : "";
+  f.elements.currency.value = a.currency || "";
+  f.elements.deposit_status.value = a.deposit_status || "pending";
+  f.elements.appt_status.value = a.appt_status || "scheduled";
+  f.elements.notes.value = a.notes || "";
+  editDlg.showModal();
+}
+document.getElementById("btn-cancel-edit").addEventListener("click", () =>
+  editDlg.close());
+document.getElementById("frm-edit-appt").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const data = {};
+  new FormData(e.target).forEach((v, k) => { data[k] = v === "" ? null : v; });
+  const id = data.edit_id;
+  delete data.edit_id;
+  data.deposit_amount = parseFloat(data.deposit_amount) || 0; // mirror DB.create
+  DB.update(id, data);
+  editDlg.close();
+  renderAll();
+});
+
 /* ---- Settings ------------------------------------------------------------------ */
 function loadSettings() {
   const s = DB.settings();
@@ -207,6 +288,84 @@ document.getElementById("frm-settings").addEventListener("submit", (e) => {
   setTimeout(() => { el.textContent = ""; }, 2000);
 });
 
+/* ---- Storage failure signal (called from db.js _write/_nextId) ------------------ */
+window.__ndtStorageFailed = function () {
+  const el = document.getElementById("store-error");
+  if (el) {
+    el.textContent = t("storage_full");
+    el.style.display = "";
+  }
+};
+window.__ndtStorageOk = function () {
+  const el = document.getElementById("store-error");
+  if (el) el.style.display = "none";
+};
+
+/* ---- Backup export / import ------------------------------------------------------ */
+function _depSeq() {
+  try { return localStorage.getItem("dep_seq") || "0"; } catch { return "0"; }
+}
+
+document.getElementById("btn-export").addEventListener("click", () => {
+  const backup = {
+    app: "noshow-deposit-tracker",
+    exported_at: DB.nowIso(),
+    dep_appts: DB._read("dep_appts", []),
+    dep_settings: DB._read("dep_settings", {}),
+    dep_seq: _depSeq(),
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)],
+    { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "deposit-tracker-backup.json";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+
+document.getElementById("btn-import").addEventListener("click", () =>
+  document.getElementById("file-import").click());
+
+// Shape-check BEFORE anything is written, so a bad file changes nothing.
+function validateBackup(obj) {
+  if (!obj || typeof obj !== "object" || Array.isArray(obj)) return false;
+  if (!Array.isArray(obj.dep_appts)) return false;
+  if (!obj.dep_appts.every((a) => a && a.id !== undefined && a.id !== null)) return false;
+  if (!obj.dep_settings || typeof obj.dep_settings !== "object" ||
+    Array.isArray(obj.dep_settings)) return false;
+  if (obj.dep_seq === undefined || obj.dep_seq === null ||
+    isNaN(parseInt(obj.dep_seq, 10))) return false;
+  return true;
+}
+
+document.getElementById("file-import").addEventListener("change", (e) => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = "";
+  if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    let obj = null;
+    try { obj = JSON.parse(rd.result); } catch { obj = null; }
+    const msg = document.getElementById("backup-msg");
+    if (!validateBackup(obj)) {
+      msg.textContent = t("import_invalid");
+      return;
+    }
+    DB._write("dep_appts", obj.dep_appts);
+    DB._write("dep_settings", obj.dep_settings);
+    try {
+      localStorage.setItem("dep_seq", String(parseInt(obj.dep_seq, 10) || 0));
+      window.__ndtStorageOk();
+    } catch { window.__ndtStorageFailed(); }
+    loadSettings();
+    renderAll();
+    msg.textContent = t("import_done");
+    setTimeout(() => { msg.textContent = ""; }, 3000);
+  };
+  rd.readAsText(f);
+});
 /* ---- Boot ------------------------------------------------------------------------ */
 function renderAll() {
   renderDashboard();
